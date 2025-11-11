@@ -14,9 +14,12 @@ class User(Base):
     external_id = Column(String, index=True, nullable=True)
     name = Column(String, nullable=True)
     email = Column(String, nullable=True)
+    username = Column(String, unique=True, index=True, nullable=True)
+    password_hash = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     chat_sessions = relationship("ChatSession", back_populates="user")
+
 
 
 class ChatSession(Base):

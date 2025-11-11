@@ -1,13 +1,27 @@
 # app/main.py
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.db import models
 from app.api import chat
+from app.api import auth
 
 app = FastAPI(title="Plant Care Backend")
 
+origins = [
+    "http://localhost:4200",
+    "http://127.0.0.1:4200",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
@@ -16,4 +30,8 @@ def health(db: Session = Depends(get_db)):
 
 
 # Router del chatbot
+
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
+
+# Router de autenticación
+app.include_router(auth.router, prefix="/auth", tags=["auth"])

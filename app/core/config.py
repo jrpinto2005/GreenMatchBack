@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     project_id: str
     vertex_location: str = "us-central1"
     vertex_model_name: str = "gemini-1.5-pro"
+    
+    auth_secret: str = "placeholder_secret"
+    password_salt: str = "placeholder_salt"
 
     # Importante: ignorar variables extra del .env (db_user, db_password, etc.)
     model_config = SettingsConfigDict(
