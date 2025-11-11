@@ -1,8 +1,10 @@
 # app/api/chat.py (al inicio del archivo)
+from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from typing import List, Optional, Dict, Any, Literal
 
 from app.db.session import get_db
 from app.db import models
@@ -23,7 +25,26 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     session_id: int
     reply: str
+class ConversationSummary(BaseModel):
+    id: int
+    started_at: datetime
+    last_activity_at: datetime
+    title: str | None
 
+    model_config = {
+        "from_attributes": True  
+    }
+
+
+class MessageOut(BaseModel):
+    id: int
+    session_id: int
+    sender: str
+    content: str | None
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
 @router.post("/message", response_model=ChatResponse)
 def chat_message(payload: ChatRequest, db: Session = Depends(get_db)):
     # 1. Obtener o crear sesión
@@ -33,7 +54,9 @@ def chat_message(payload: ChatRequest, db: Session = Depends(get_db)):
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found")
     else:
-        session = models.ChatSession(user_id=payload.user_id)
+        session = models.ChatSession(
+            user_id=payload.user_id
+        )
         db.add(session)
         db.commit()
         db.refresh(session)
@@ -208,3 +231,68 @@ No menciones que hiciste un análisis de intención ni que convertiste nada a JS
     db.refresh(assistant_msg)
 
     return ChatResponse(session_id=session.id, reply=reply_text)
+
+@router.get("/sessions", response_model=List[ConversationSummary])
+def list_user_sessions(user_id: int, db: Session = Depends(get_db)):
+    """
+    Lista las conversaciones (ChatSession) de un usuario, ordenadas por última actividad.
+    Siempre devuelve una lista (posiblemente vacía).
+    """
+    sessions = (
+        db.query(models.ChatSession)
+        .filter(models.ChatSession.user_id == user_id)
+        .order_by(models.ChatSession.last_activity_at.desc())
+        .all()
+    )
+
+    summaries: List[ConversationSummary] = []
+
+    for s in sessions:
+        # Primer mensaje de usuario como título resumido
+        first_user_msg = (
+            db.query(models.ChatMessage)
+            .filter(
+                models.ChatMessage.session_id == s.id,
+                models.ChatMessage.sender == "user",
+            )
+            .order_by(models.ChatMessage.created_at.asc())
+            .first()
+        )
+
+        if first_user_msg and first_user_msg.content:
+            raw_title = first_user_msg.content.strip()
+            title = raw_title[:50] + "…" if len(raw_title) > 50 else raw_title
+        else:
+            title = f"Conversación #{s.id}"
+
+        summaries.append(
+            ConversationSummary(
+                id=s.id,
+                started_at=s.started_at,
+                last_activity_at=s.last_activity_at,
+                title=title,
+            )
+        )
+
+    return summaries
+        
+@router.get("/sessions/{session_id}/messages", response_model=List[MessageOut])
+def get_session_messages(session_id: int, db: Session = Depends(get_db)):
+    """
+    Devuelve todos los mensajes de una conversación.
+    """
+    session = db.query(models.ChatSession).get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    msgs = (
+        db.query(models.ChatMessage)
+        .filter(models.ChatMessage.session_id == session_id)
+        .order_by(models.ChatMessage.created_at.asc())
+        .all()
+    )
+
+    return msgs
+
+    return summaries
+
