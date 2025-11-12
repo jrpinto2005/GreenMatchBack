@@ -12,6 +12,9 @@ from app.core.vertex_client import (
     generate_gemini_response,
     analyze_user_message,
 )
+from app.services.care_plans import ensure_care_plan_for_plant
+from app.services.plants import ensure_plant_for_user
+
 
 router = APIRouter()
 
@@ -70,6 +73,9 @@ def chat_message(payload: ChatRequest, db: Session = Depends(get_db)):
         message_type="text",
     )
     db.add(user_msg)
+    
+    session.last_activity_at = datetime.utcnow()
+    db.add(session)
     db.commit()
     db.refresh(user_msg)
 
@@ -160,7 +166,38 @@ def chat_message(payload: ChatRequest, db: Session = Depends(get_db)):
         db.refresh(assistant_msg)
 
         return ChatResponse(session_id=session.id, reply=reply_text)
+    
+    # 6.5 Auto-crear planta (y opcionalmente el care plan) ANTES de generar la respuesta
+    created_plant = None
+    created_plan = None
 
+    owner_user_id = payload.user_id or session.user_id
+    if owner_user_id and plant_name and not need_clarification:
+        # Crear/Asegurar planta con datos inferidos
+        created_plant = ensure_plant_for_user(
+            db=db,
+            user_id=owner_user_id,
+            common_name=plant_name,
+            source="chat",
+            light=light,
+            humidity=humidity,
+            temperature=temperature,
+            location=location,
+        )
+
+        # Si la intención fue "care_plan", generar y guardar el plan ahora
+        if mode == "care_plan":
+            try:
+                created_plan = ensure_care_plan_for_plant(
+                    db=db,
+                    user_id=owner_user_id,
+                    plant=created_plant,
+                    session_id=session.id,
+                )
+            except Exception:
+                # Falla silenciosa del plan no debe impedir la conversación
+                created_plan = None
+                
     # 7. Si tenemos suficiente info, construimos el prompt especializado
     mode_instruction = {
         "general": (
@@ -218,7 +255,13 @@ No menciones que hiciste un análisis de intención ni que convertiste nada a JS
 """
 
     reply_text = generate_gemini_response(full_prompt)
-
+    # 7.5 Anexar confirmación visible al usuario sobre la creación
+    
+    if created_plan:
+        reply_text += "... guardé su plan de cuidado ..."
+    elif created_plant:
+        reply_text += "... pulsa **Crear plan** ..."
+            
     # 8. Guardar respuesta del asistente
     assistant_msg = models.ChatMessage(
         session_id=session.id,
@@ -294,5 +337,5 @@ def get_session_messages(session_id: int, db: Session = Depends(get_db)):
 
     return msgs
 
-    return summaries
+
 

@@ -7,6 +7,8 @@ from app.db.session import get_db
 from app.db import models
 from app.api import chat
 from app.api import auth
+from app.api import plants
+
 
 app = FastAPI(title="Plant Care Backend")
 
@@ -30,8 +32,8 @@ def health(db: Session = Depends(get_db)):
 
 
 # Router del chatbot
-
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
-
 # Router de autenticación
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+#Router de plantas 
+app.include_router(plants.router, prefix="/plants", tags=["plants"])

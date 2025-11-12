@@ -65,14 +65,48 @@ class PlantPrediction(Base):
 
     message = relationship("ChatMessage", back_populates="plant_predictions")
 
-
 class CarePlan(Base):
     __tablename__ = "care_plans"
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    plant_id = Column(Integer, ForeignKey("plants.id"), nullable=True)
     plant_name = Column(Text, nullable=False)
     environment_json = Column(JSONB, nullable=True)
     plan_json = Column(JSONB, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    #relación ORM hacia Plant
+    plant = relationship("Plant", back_populates="care_plans")
+
+
+class Plant(Base):
+    __tablename__ = "plants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    common_name = Column(Text, nullable=False)
+    scientific_name = Column(Text, nullable=True)
+    nickname = Column(Text, nullable=True)
+
+    location = Column(Text, nullable=True)
+    light = Column(String, nullable=True)
+    humidity = Column(String, nullable=True)
+    temperature = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+
+    status = Column(String, default="active")
+    source = Column(String, default="manual")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="plants", lazy="joined")
+
+    #relación ORM hacia CarePlan
+    care_plans = relationship(
+        "CarePlan",
+        back_populates="plant",
+        lazy="selectin",
+        order_by="desc(CarePlan.created_at)",
+    )
