@@ -1,19 +1,24 @@
 # app/core/vertex_client.py
 import json
+from typing import Iterable, List, Optional
+
 import vertexai
-from vertexai.generative_models import GenerativeModel
+from vertexai.generative_models import GenerativeModel, Part
 from app.core.config import settings
 
+# Init global
 vertexai.init(
     project=settings.project_id,
     location=settings.vertex_location,
 )
-
 model = GenerativeModel(settings.vertex_model_name)
 
 
+# -------------------------------------------------
+# 1. Texto plano
+# -------------------------------------------------
 def generate_gemini_response(prompt: str) -> str:
-    """Llama a Gemini para generar una respuesta en texto plano."""
+    """Llama a Gemini para generar una respuesta en texto plano (solo prompt de texto)."""
     response = model.generate_content(prompt)
 
     # Intentar usar response.text
@@ -42,6 +47,70 @@ def generate_gemini_response(prompt: str) -> str:
     return "".join(texts)
 
 
+# -------------------------------------------------
+# 2. NUEVO: Texto + imágenes (GCS URIs)
+# -------------------------------------------------
+def generate_gemini_response_with_images(
+    prompt: str,
+    image_gcs_uris: Optional[List[str]] = None,
+) -> str:
+    """
+    Llama a Gemini con un prompt de texto + hasta N imágenes (por ahora máx 3).
+    Cada imagen se pasa como Part con referencia a GCS:
+      - gs://bucket/path/to/image.jpg
+
+    Úsalo cuando quieras que el modelo tenga en cuenta las fotos del usuario
+    (identificación de planta, manchas en hojas, etc).
+    """
+    image_gcs_uris = image_gcs_uris or []
+    # Por si acaso, limitamos a 3 aquí también
+    image_gcs_uris = image_gcs_uris[:3]
+
+    # Construir la lista de parts: primero las imágenes, luego el texto
+    parts: List[Part] = []
+
+    for uri in image_gcs_uris:
+        # Part.from_uri crea un part que referencia un archivo en GCS
+        parts.append(
+            Part.from_uri(
+                uri=uri,
+                mime_type="image/jpeg",  # si usas png cambia a image/png o detecta según extensión
+            )
+        )
+
+    # Por último, el prompt de texto
+    parts.append(Part.from_text(prompt))
+
+    response = model.generate_content(parts)
+
+    # Igual que en la función de texto
+    try:
+        if getattr(response, "text", None):
+            return response.text
+    except Exception:
+        pass
+
+    if not response.candidates:
+        raise ValueError("La respuesta de Vertex AI no contiene candidatos.")
+
+    candidate = response.candidates[0]
+    cparts = getattr(candidate.content, "parts", []) or []
+
+    texts = []
+    for p in cparts:
+        text = getattr(p, "text", None)
+        if text:
+            texts.append(text)
+
+    if not texts:
+        raise ValueError("No se encontraron partes de texto en la respuesta de Vertex AI.")
+
+    return "".join(texts)
+
+
+# -------------------------------------------------
+# 3. Análisis de intención
+# -------------------------------------------------
 def analyze_user_message(
     history_text: str,
     session_context: dict,
@@ -124,12 +193,13 @@ Ejemplo de formato EXACTO:
 Ahora genera SOLO el JSON para este caso.
 """
 
+    # Aquí seguimos usando solo texto, no imágenes
     raw = model.generate_content(analysis_prompt)
     analysis_text = generate_gemini_response(analysis_prompt)
 
     try:
         data = json.loads(analysis_text)
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         # fallback muy simple si algo falla: modo general sin aclaración
         return {
             "mode": "general",

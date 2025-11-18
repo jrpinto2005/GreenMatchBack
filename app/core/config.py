@@ -8,13 +8,6 @@ class Settings(BaseSettings):
     vertex_location: str
     vertex_model_name: str
 
-    # Base de datos (opcionales aquí; en session.py ya usamos os.getenv directamente)
-    db_user: str = "appuser"
-    db_password: str = "TU_PASSWORD_AQUI"
-    db_name: str = "plant_app_db"
-    db_host: str | None = None
-    db_port: int | None = None
-
     # Cloud SQL (para Cloud Run)
     instance_connection_name: str | None = None
 
@@ -30,7 +23,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore",  # 👈 Ignora cualquier variable adicional que no esté declarada
+        extra="ignore",  # Ignora cualquier variable adicional que no esté declarada
     )
 
 

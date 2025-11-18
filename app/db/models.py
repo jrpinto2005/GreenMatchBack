@@ -44,7 +44,7 @@ class ChatMessage(Base):
     sender = Column(String, nullable=False)
     content = Column(Text, nullable=True)
     message_type = Column(String, default="text")
-    image_gcs_uri = Column(Text, nullable=True)
+    image_gcs_uris = Column(JSONB, nullable=True)
     vertex_model_name = Column(Text, nullable=True)
     vertex_response_json = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
