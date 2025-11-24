@@ -33,7 +33,11 @@ class ChatSession(Base):
     environment_json = Column(JSONB, nullable=True)
 
     user = relationship("User", back_populates="chat_sessions")
-    messages = relationship("ChatMessage", back_populates="session")
+    messages = relationship(
+        "ChatMessage",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
 
 
 class ChatMessage(Base):
@@ -50,7 +54,11 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     session = relationship("ChatSession", back_populates="messages")
-    plant_predictions = relationship("PlantPrediction", back_populates="message")
+    plant_predictions = relationship(
+    "PlantPrediction",
+    back_populates="message",
+    cascade="all, delete-orphan",
+)
 
 
 class PlantPrediction(Base):
@@ -80,7 +88,6 @@ class CarePlan(Base):
     #relación ORM hacia Plant
     plant = relationship("Plant", back_populates="care_plans")
 
-
 class Plant(Base):
     __tablename__ = "plants"
 
@@ -97,13 +104,15 @@ class Plant(Base):
     temperature = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
 
+    image_gcs_uri = Column(Text, nullable=True)
+
     status = Column(String, default="active")
     source = Column(String, default="manual")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", backref="plants", lazy="joined")
 
-    #relación ORM hacia CarePlan
+    # relación ORM hacia CarePlan
     care_plans = relationship(
         "CarePlan",
         back_populates="plant",

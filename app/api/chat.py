@@ -2,7 +2,8 @@
 from datetime import datetime
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -431,3 +432,14 @@ async def upload_chat_images(
         "image_urls": image_urls,
         "message_id": msg.id,
     }
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_session(session_id: int, db: Session = Depends(get_db)):
+    session = db.query(models.ChatSession).get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
+    db.delete(session)
+    db.commit()
+    return

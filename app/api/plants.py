@@ -1,13 +1,13 @@
-# app/api/plants.py
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.db import models
+from app.services.storage import upload_plant_image  # NUEVO
 
 router = APIRouter()
 
@@ -23,6 +23,9 @@ class PlantCreate(BaseModel):
     temperature: Optional[str] = None
     notes: Optional[str] = None
     source: Optional[str] = "manual"
+    # opcionalmente se podría crear ya con una URI si la tuvieras
+    image_gcs_uri: Optional[str] = None
+
 
 class PlantPatch(BaseModel):
     common_name: Optional[str] = None
@@ -34,9 +37,12 @@ class PlantPatch(BaseModel):
     temperature: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None
+    image_gcs_uri: Optional[str] = None  # NUEVO
+
 
 class PlantOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     common_name: str
@@ -47,9 +53,11 @@ class PlantOut(BaseModel):
     humidity: Optional[str]
     temperature: Optional[str]
     notes: Optional[str]
+    image_gcs_uri: Optional[str]  # NUEVO
     status: str
     source: str
     created_at: datetime
+
 
 # NUEVO: esquema para responder el plan
 class CarePlanOut(BaseModel):
@@ -60,6 +68,7 @@ class CarePlanOut(BaseModel):
     environment_json: Optional[dict] = None
     plan_json: dict
 
+
 # -------- Endpoints --------
 @router.post("/", response_model=PlantOut)
 def create_plant(payload: PlantCreate, db: Session = Depends(get_db)):
@@ -68,6 +77,7 @@ def create_plant(payload: PlantCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(plant)
     return plant
+
 
 @router.get("/", response_model=List[PlantOut])
 def list_plants(user_id: int, db: Session = Depends(get_db)):
@@ -78,12 +88,14 @@ def list_plants(user_id: int, db: Session = Depends(get_db)):
     )
     return q.all()
 
+
 @router.get("/{plant_id}", response_model=PlantOut)
 def get_plant(plant_id: int, db: Session = Depends(get_db)):
     plant = db.query(models.Plant).get(plant_id)
     if not plant:
         raise HTTPException(status_code=404, detail="Plant not found")
     return plant
+
 
 @router.patch("/{plant_id}", response_model=PlantOut)
 def update_plant(plant_id: int, payload: PlantPatch, db: Session = Depends(get_db)):
@@ -98,6 +110,7 @@ def update_plant(plant_id: int, payload: PlantPatch, db: Session = Depends(get_d
     db.refresh(plant)
     return plant
 
+
 @router.delete("/{plant_id}")
 def archive_plant(plant_id: int, db: Session = Depends(get_db)):
     plant = db.query(models.Plant).get(plant_id)
@@ -107,6 +120,40 @@ def archive_plant(plant_id: int, db: Session = Depends(get_db)):
     db.add(plant)
     db.commit()
     return {"ok": True}
+
+
+# NUEVO: endpoint para subir / actualizar foto de la planta
+@router.post("/{plant_id}/image", response_model=PlantOut)
+async def upload_plant_photo(
+    plant_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Sube una imagen al bucket en foto_planta/ y actualiza image_gcs_uri
+    de la planta. Devuelve la planta actualizada.
+    """
+    plant = db.query(models.Plant).get(plant_id)
+    if not plant:
+        raise HTTPException(status_code=404, detail="Plant not found")
+
+    data = await file.read()
+    content_type = file.content_type or "image/jpeg"
+
+    gcs_uri = upload_plant_image(
+        data=data,
+        content_type=content_type,
+        user_id=plant.user_id,
+        plant_id=plant.id,
+    )
+
+    plant.image_gcs_uri = gcs_uri
+    db.add(plant)
+    db.commit()
+    db.refresh(plant)
+
+    return plant
+
 
 # NUEVO: último CarePlan de la planta
 @router.get("/{plant_id}/care-plan", response_model=Optional[CarePlanOut])
@@ -125,4 +172,4 @@ def get_latest_care_plan(plant_id: int, db: Session = Depends(get_db)):
         .order_by(models.CarePlan.created_at.desc())
         .first()
     )
-    return cp  
+    return cp
