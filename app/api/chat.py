@@ -282,12 +282,11 @@ Responde solo con el mensaje que le dirías al usuario, en un tono cercano pero 
 No menciones que hiciste un análisis de intención ni que convertiste nada a JSON.
 """
 
-    # 🔥 AQUÍ VIENE EL CAMBIO IMPORTANTE 🔥
     # Si hay imágenes y el modo es "identify", usamos la función multimodal.
     if payload.image_uris and mode == "identify":
         reply_text = generate_gemini_response_with_images(
             full_prompt,
-            image_gcs_uris=payload.image_uris,  # las gs:// que guardaste en DB
+            image_gcs_uris=payload.image_uris,  
         )
     else:
         reply_text = generate_gemini_response(full_prompt)
@@ -296,7 +295,7 @@ No menciones que hiciste un análisis de intención ni que convertiste nada a JS
     if created_plan:
         reply_text += "... guardé su plan de cuidado ..."
     elif created_plant:
-        reply_text += "... pulsa **Crear plan** ..."
+        reply_text += "... Si quieres el plan de cuidado, especificame tu ubicación, donde tienes la planta y las condiciones ambientales (luz, humedad, etc). Entre más detalles sobre la planta mejor podré ayudarte ..."
 
     # 8. Guardar respuesta del asistente
     assistant_msg = models.ChatMessage(

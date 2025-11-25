@@ -119,7 +119,7 @@ def ensure_care_plan_for_plant(
     cp = models.CarePlan(
         session_id=session_id,
         user_id=user_id,
-        plant_id=plant.id,               # requiere columna en tu modelo/migración
+        plant_id=plant.id,               
         plant_name=plant.common_name,
         environment_json={
             "location": plant.location,
@@ -127,7 +127,7 @@ def ensure_care_plan_for_plant(
             "humidity": plant.humidity,
             "temperature": plant.temperature,
         },
-        plan_json=plan_model.model_dump(),  # dict validado
+        plan_json=plan_model.model_dump(),  
     )
     db.add(cp)
     db.commit()
