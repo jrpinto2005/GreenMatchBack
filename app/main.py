@@ -20,7 +20,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"], # CAMBIAR CUANDO EL FRONTEND ESTÉ EN PRODUCCIÓN
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
