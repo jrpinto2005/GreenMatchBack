@@ -8,6 +8,7 @@ from app.db import models
 from app.api import chat
 from app.api import auth
 from app.api import plants
+from app.api import marketplace
 
 
 app = FastAPI(title="Plant Care Backend")
@@ -38,3 +39,5 @@ app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 #Router de plantas 
 app.include_router(plants.router, prefix="/plants", tags=["plants"])
+# Router de marketplace
+app.include_router(marketplace.router, prefix="/marketplace", tags=["marketplace"])

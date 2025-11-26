@@ -1,8 +1,9 @@
 # app/db/models.py
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, ForeignKey, Numeric
+    Column, Integer, String, Text, DateTime, ForeignKey, Numeric, Boolean
 )
+
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -119,3 +120,58 @@ class Plant(Base):
         lazy="selectin",
         order_by="desc(CarePlan.created_at)",
     )
+
+
+class MarketplaceItem(Base):
+    __tablename__ = "marketplace_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    price = Column(Numeric(10, 2), nullable=False)
+    image_url = Column(String, nullable=True)
+    category = Column(String, index=True)  # e.g., 'plant', 'pot', 'fertilizer'
+    stock = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    shipping_address = Column(Text, nullable=False)
+    payment_method = Column(String, nullable=False)  # 'transfer' or 'cash'
+    total_amount = Column(Numeric(10, 2), nullable=False)
+    status = Column(String, default="pending")  # 'pending', 'completed', 'cancelled'
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="orders")
+    items = relationship("OrderItem", back_populates="order")
+
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    item_id = Column(Integer, ForeignKey("marketplace_items.id"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit_price = Column(Numeric(10, 2), nullable=False)
+
+    order = relationship("Order", back_populates="items")
+    item = relationship("MarketplaceItem")
+
+
+class ItemRequest(Base):
+    __tablename__ = "item_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    item_name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String, default="pending")  # 'pending', 'approved', 'rejected'
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="item_requests")

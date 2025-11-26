@@ -65,3 +65,27 @@ def upload_plant_image(
 
     gcs_uri = f"gs://{settings.gcs_bucket}/{blob_name}"
     return gcs_uri
+
+def upload_marketplace_item_image(
+    data: bytes,
+    content_type: str,
+    item_id: int,
+) -> str:
+    """
+    Sube una imagen de artículo del marketplace al bucket configurado
+    y devuelve la URI gs://.
+    """
+    client = get_storage_client()
+    bucket = client.bucket(settings.gcs_bucket)
+
+    ts = int(time.time())
+    file_id = uuid.uuid4().hex[:8]
+
+    # Ruta organizada por artículo
+    blob_name = f"marketplace_items/item-{item_id}/{ts}_{file_id}"
+
+    blob = bucket.blob(blob_name)
+    blob.upload_from_string(data, content_type=content_type)
+    blob.make_public()
+    public_url = f"https://storage.googleapis.com/{settings.gcs_bucket}/{blob_name}"
+    return public_url
